@@ -1,0 +1,24 @@
+{
+  "workDir": "{cwd}",
+  "steps": [
+    {
+      "step": "for-each-file",
+      "dir": "{input}",
+      "steps": [
+        {
+          "step": "for-each-value",
+          "name": "crop",
+          "values": ["2x3", "3x4", "4x5", "11x14", "ISO"],
+          "steps": [
+            {
+              "step": "crop",
+              "aspectRatio": "{value}",
+              "input": "{filepath}",
+              "output": "{filename}/{value}.{ext}"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
