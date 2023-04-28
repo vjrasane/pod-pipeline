@@ -6,6 +6,19 @@
       "dir": "{input}",
       "steps": [
         {
+          "step": "chat",
+          "name": "naming",
+          "prompt": {
+            "source": "file",
+            "path": "prompts/naming.txt"
+          },
+          "output": {
+            "storage": "variable",
+            "name": "propername"
+          },
+          "maxTokens": 25
+        },
+        {
           "step": "for-each-value",
           "name": "crop",
           "values": ["2x3", "3x4", "4x5", "11x14", "ISO"],
@@ -14,7 +27,7 @@
               "step": "crop",
               "aspectRatio": "{value}",
               "input": "{filepath}",
-              "output": "{filename}/{value}.{ext}"
+              "output": "{vars.propername}/{value}{ext}"
             }
           ]
         }

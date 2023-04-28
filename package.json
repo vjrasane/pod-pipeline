@@ -11,9 +11,14 @@
   "license": "ISC",
   "dependencies": {
     "decoders": "^2.0.3",
+    "dotenv": "^16.0.3",
+    "lodash": "^4.17.21",
+    "openai": "^3.2.1",
+    "sharp": "^0.32.0",
     "yargs": "^17.7.1"
   },
   "devDependencies": {
+    "@types/lodash": "^4.14.194",
     "@types/node": "^18.16.0",
     "@types/yargs": "^17.0.24"
   }
