@@ -1,13 +1,27 @@
 import yargs from "yargs";
-import dotenv from "dotenv"
+import dotenv from "dotenv";
+import { resolve } from "path";
 
-export default () => {
-    const argv = yargs(process.argv.slice(2))
-        .options({
-            input: { type: "string", demandOption: true, alias: "i" },
-        })
-        .parseSync();
+export type Options = {
+  input: string;
+  output: string;
+};
 
-    dotenv.config()
-    return argv
-}
+export default (): Options => {
+  const argv = yargs(process.argv.slice(2))
+    .options({
+      input: { type: "string", demandOption: true, alias: "i" },
+    })
+    .option({
+      output: {
+        type: "string",
+        demandOption: false,
+        alias: "o",
+        default: resolve(process.cwd(), "output"),
+      },
+    })
+    .parseSync();
+
+  dotenv.config();
+  return argv;
+};

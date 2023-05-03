@@ -3,3 +3,9 @@ node_modules
 input
 *.png
 *.jpg
+*.exe
+*.psd
+*.bin
+*.param
+*.dll
+.vscode

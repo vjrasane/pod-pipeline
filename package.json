@@ -10,16 +10,24 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "axios": "^1.4.0",
     "decoders": "^2.0.3",
+    "decompress": "^4.2.1",
     "dotenv": "^16.0.3",
+    "download": "^8.0.0",
+    "glob": "^10.2.2",
     "lodash": "^4.17.21",
     "openai": "^3.2.1",
+    "semaphore-promise": "^1.4.1",
     "sharp": "^0.32.0",
+    "tmp": "^0.2.1",
     "yargs": "^17.7.1"
   },
   "devDependencies": {
+    "@types/download": "^8.0.2",
     "@types/lodash": "^4.14.194",
     "@types/node": "^18.16.0",
+    "@types/tmp": "^0.2.3",
     "@types/yargs": "^17.0.24"
   }
 }
