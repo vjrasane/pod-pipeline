@@ -7,24 +7,35 @@ import init, { Options } from "./init";
 import naming from "./prompts/naming";
 import resize from "./functions/resize";
 import upscale from "./functions/upscale";
-import { FileDescriptor, getImageDimensions, getTaggedFileName } from "./utils";
+import {
+  FileDescriptor,
+  getFileDescriptor,
+  getImageDimensions,
+  getTaggedFileName,
+} from "./utils";
 import { join, resolve } from "path";
 import crop from "./functions/crop";
 import forEachValue from "./functions/for-each-value";
 import { promisify } from "util";
 import run from "./run";
 import mockup from "./functions/mockup";
+import { driveUpload, driveShare } from "./functions/drive";
 
 const PIXELS_PER_INCH = 300;
 const UPSCALE_MULTIPLIER = 4;
 
 const processFile = async (file: FileDescriptor, outputDir: string) => {
+  const workDir = process.cwd();
   const config = {
-    workDir: process.cwd(),
+    workDir,
     openAiApiKey: nonEmptyString.verify(process.env.OPENAI_API_KEY),
     openAiOrganizationId: nonEmptyString.verify(
       process.env.OPENAI_ORGANIZATION_ID
     ),
+    discordBotId: nonEmptyString.verify(process.env.DISCORD_BOT_ID),
+    discordBotToken: nonEmptyString.verify(process.env.DISCORD_BOT_TOKEN),
+    credentialsFile: resolve(workDir, "./credentials.json"),
+    tokenFile: resolve(workDir, "./token.json"),
   };
 
   // const name = chat({ prompt: naming(file.name, 25), maxTokens: 25 }, config)
@@ -86,6 +97,20 @@ const processFile = async (file: FileDescriptor, outputDir: string) => {
     },
     config
   );
+
+  const listingId = "listingId";
+  const listingFolderPath = `Listings/${listingId}`;
+  const sharedFolderPath = `${listingFolderPath}/Shared`;
+
+  await driveUpload(
+    {
+      files: cropped.map(getFileDescriptor),
+      folderPath: sharedFolderPath,
+    },
+    config
+  );
+  const link = await driveShare({ folderPath: sharedFolderPath }, config);
+  console.log(link);
 };
 
 run(async (file: FileDescriptor, opts: Options) => {

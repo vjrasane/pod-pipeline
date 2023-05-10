@@ -9,3 +9,5 @@ input
 *.param
 *.dll
 .vscode
+credentials.json
+token.json
