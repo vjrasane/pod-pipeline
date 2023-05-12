@@ -4,7 +4,9 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build": "tsc -p ./tsconfig.json",
+    "discord-listener": "ts-node ./functions/discord.ts"
   },
   "keywords": [],
   "author": "",
@@ -13,6 +15,7 @@
     "@discordjs/core": "^0.6.0",
     "@google-cloud/local-auth": "^2.1.1",
     "axios": "^1.4.0",
+    "csv-writer": "^1.6.0",
     "decoders": "^2.0.3",
     "decompress": "^4.2.1",
     "discord.js": "^14.10.2",
@@ -22,9 +25,15 @@
     "googleapis": "^118.0.0",
     "lodash": "^4.17.21",
     "openai": "^3.2.1",
+    "puppeteer": "^20.1.2",
+    "puppeteer-extra": "^3.3.6",
+    "puppeteer-extra-plugin-adblocker": "^2.13.6",
+    "puppeteer-extra-plugin-stealth": "^2.11.2",
     "semaphore-promise": "^1.4.1",
     "sharp": "^0.32.0",
     "tmp": "^0.2.1",
+    "ts-node": "^10.9.1",
+    "typescript": "^5.0.4",
     "yargs": "^17.7.1"
   },
   "devDependencies": {

@@ -8,6 +8,8 @@ input
 *.bin
 *.param
 *.dll
+dist
 .vscode
 credentials.json
 token.json
+output

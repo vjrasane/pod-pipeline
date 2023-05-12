@@ -1,25 +1,25 @@
 import { nonEmptyString } from "decoders";
 import { mkdtemp, mkdtempSync, readdirSync, readFileSync, rm, rmdir } from "fs";
 import { assignInAllWith } from "lodash/fp";
-import chat from "./functions/chat";
-import forEachFile from "./functions/for-each-file";
-import init, { Options } from "./init";
-import naming from "./prompts/naming";
-import resize from "./functions/resize";
-import upscale from "./functions/upscale";
+import { chat } from "../functions/chat";
+import forEachFile from "../functions/for-each-file";
+import init, { Options } from "../init";
+import naming from "../prompts/naming";
+import { resize } from "../functions/image";
+import upscale from "../functions/upscale";
 import {
   FileDescriptor,
   getFileDescriptor,
   getImageDimensions,
   getTaggedFileName,
-} from "./utils";
+} from "../utils";
 import { join, resolve } from "path";
-import crop from "./functions/crop";
-import forEachValue from "./functions/for-each-value";
+import crop from "../functions/crop";
+import forEachValue from "../functions/for-each-value";
 import { promisify } from "util";
-import run from "./run";
-import mockup from "./functions/mockup";
-import { driveUpload, driveShare } from "./functions/drive";
+import run from "../run";
+import mockup from "../functions/mockup";
+import { driveUpload, driveShare } from "../functions/drive";
 
 const PIXELS_PER_INCH = 300;
 const UPSCALE_MULTIPLIER = 4;

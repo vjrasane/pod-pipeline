@@ -8,10 +8,7 @@ interface OpenAiConfig {
 }
 
 interface DiscordConfig {
-  discordBotId: string;
   discordBotToken: string;
-  discordGuildName: string;
-  discordChannelName: string;
 }
 
 interface GoogleApiConfig {
@@ -19,4 +16,9 @@ interface GoogleApiConfig {
   tokenFile: string;
 }
 
-export { Config, OpenAiConfig, DiscordConfig, GoogleApiConfig };
+interface AdobeConfig {
+  adobeStockUsername: string;
+  adobeStockPassword: string;
+}
+
+export { Config, OpenAiConfig, DiscordConfig, GoogleApiConfig, AdobeConfig };

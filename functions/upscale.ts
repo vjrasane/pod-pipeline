@@ -56,32 +56,34 @@ const upscale = async (
 
   const executable = await initExecutable(workDir);
   const release = await semaphore.acquire();
-  const child = spawn(
-    executable,
-    [
-      "-i",
-      resolve(workDir, input),
-      "-o",
-      outputPath,
-      "-s",
-      "4",
-      "-n",
-      "realesrgan-x4plus",
-      "-v",
-    ],
-    {
-      stdio: ["pipe", process.stdout, process.stderr],
-    }
-  );
-
-  await new Promise((resolve, reject) => {
-    child.on("exit", (code) =>
-      code !== 0 ? reject(code) : resolve(outputPath)
+  try {
+    const child = spawn(
+      executable,
+      [
+        "-i",
+        resolve(workDir, input),
+        "-o",
+        outputPath,
+        "-s",
+        "4",
+        "-n",
+        "realesrgan-x4plus",
+        "-v",
+      ],
+      {
+        stdio: ["pipe", process.stdout, process.stderr],
+      }
     );
-  });
 
-  release();
-  return outputPath;
+    await new Promise((resolve, reject) => {
+      child.on("exit", (code) =>
+        code !== 0 ? reject(code) : resolve(outputPath)
+      );
+    });
+    return outputPath;
+  } finally {
+    release();
+  }
 };
 
 const doubleUpscale = async (

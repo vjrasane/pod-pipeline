@@ -9,10 +9,10 @@ type Callback = (file: FileDescriptor, opts: Options) => Promise<void>;
 export default async (callback: Callback): Promise<void> => {
   const opts = init();
   const inputPath = resolve(process.cwd(), opts.input);
-  const stats = statSync(inputPath);
-  if (stats.isDirectory()) {
-    await forEachFile({ dir: inputPath }, (file) => callback(file, opts));
-    return;
-  }
+  // const stats = statSync(inputPath);
+  // if (stats.isDirectory()) {
+  //   await forEachFile({ dir: inputPath }, (file) => callback(file, opts));
+  //   return;
+  // }
   return callback(getFileDescriptor(inputPath), opts);
 };

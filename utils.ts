@@ -1,10 +1,7 @@
-import { createWriteStream, exists } from "fs";
+import { readdirSync } from "fs";
 import { get, mapValues } from "lodash/fp";
-import https from "https";
-import { promisify } from "util";
-import { IncomingMessage } from "http";
 import sharp from "sharp";
-import { parse } from "path";
+import { extname, join, parse } from "path";
 
 const replaceStringVariables = (
   str: string,
@@ -77,9 +74,35 @@ export const getTaggedFileName = (
   return `${name}-${tag}${ext}`;
 };
 
+export const setFileExtension = (
+  file: FileDescriptor | string,
+  ext: string
+) => {
+  const { name } = typeof file === "object" ? file : parse(file);
+  return `${name}${ext.startsWith(".") ? ext : `.${ext}`}`;
+};
+
 export const getFileDescriptor = (filePath: string) => {
   return {
     ...parse(filePath),
     path: filePath,
   };
+};
+
+export const getDirectoryImage = (
+  filePath: string
+): FileDescriptor | undefined => {
+  const files = readdirSync(filePath);
+  const imageFile = files.find((file) =>
+    [".jpg", ".jpeg", ".png"].includes(extname(file))
+  );
+  return imageFile ? getFileDescriptor(join(filePath, imageFile)) : undefined;
+};
+
+export const getDirectoryText = (
+  filePath: string
+): FileDescriptor | undefined => {
+  const files = readdirSync(filePath);
+  const textFile = files.find((file) => [".txt"].includes(extname(file)));
+  return textFile ? getFileDescriptor(join(filePath, textFile)) : undefined;
 };
