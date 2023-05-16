@@ -9,21 +9,17 @@ type CsvWriteParameters<T extends Record<string, any>> = {
   records: T[];
 };
 
-export const writeCsv = async <T extends Record<string, any>>(
-  { header, output, records }: CsvWriteParameters<T>,
-  { workDir }: Config
-): Promise<string> => {
-  const outputPath = resolve(workDir, output);
-
-  const outputDir = dirname(outputPath);
-  mkdirSync(outputDir, { recursive: true });
-
+export const writeCsv = async <T extends Record<string, any>>({
+  header,
+  output,
+  records,
+}: CsvWriteParameters<T>): Promise<string> => {
   const writer = createObjectCsvWriter({
-    path: outputPath,
+    path: output,
     header: header as any[],
   });
 
   await writer.writeRecords(records as any);
 
-  return outputPath;
+  return output;
 };

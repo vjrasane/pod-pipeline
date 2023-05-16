@@ -5,7 +5,10 @@ import {
 } from "openai";
 import { OpenAiConfig } from "../config";
 
-const initOpenAi = ({ openAiApiKey, openAiOrganizationId }: OpenAiConfig) => {
+export const initOpenAi = ({
+  openAiApiKey,
+  openAiOrganizationId,
+}: OpenAiConfig) => {
   const configuration = new Configuration({
     organization: openAiOrganizationId,
     apiKey: openAiApiKey,
@@ -62,12 +65,16 @@ export class Conversation {
   private messages: ChatCompletionResponseMessage[];
 
   constructor(
-    config: OpenAiConfig,
-    systemMessages: { role: "system"; content: string }[] = []
+    openai: OpenAIApi,
+    messages: ChatCompletionResponseMessage[] = []
   ) {
-    this.openai = initOpenAi(config);
-    this.messages = systemMessages;
+    this.openai = openai;
+    this.messages = messages;
   }
+
+  duplicate = (): Conversation => {
+    return new Conversation(this.openai, this.messages);
+  };
 
   say = async (
     content: string,

@@ -69,6 +69,8 @@ const upscale = async (
         "-n",
         "realesrgan-x4plus",
         "-v",
+        "-t",
+        "64",
       ],
       {
         stdio: ["pipe", process.stdout, process.stderr],

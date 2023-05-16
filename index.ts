@@ -18,6 +18,12 @@ const config = {
   ),
   adobeStockUsername: nonEmptyString.verify(process.env.ADOBE_STOCK_USERNAME),
   adobeStockPassword: nonEmptyString.verify(process.env.ADOBE_STOCK_PASSWORD),
+  shutterstockUsername: nonEmptyString.verify(
+    process.env.SHUTTERSTOCK_USERNAME
+  ),
+  shutterstockPassword: nonEmptyString.verify(
+    process.env.SHUTTERSTOCK_PASSWORD
+  ),
   discordBotToken: nonEmptyString.verify(process.env.DISCORD_BOT_TOKEN),
 };
 

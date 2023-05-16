@@ -21,4 +21,16 @@ interface AdobeConfig {
   adobeStockPassword: string;
 }
 
-export { Config, OpenAiConfig, DiscordConfig, GoogleApiConfig, AdobeConfig };
+interface ShutterstockConfig {
+  shutterstockUsername: string;
+  shutterstockPassword: string;
+}
+
+export {
+  Config,
+  OpenAiConfig,
+  DiscordConfig,
+  GoogleApiConfig,
+  AdobeConfig,
+  ShutterstockConfig,
+};

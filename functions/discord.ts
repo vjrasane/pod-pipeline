@@ -125,7 +125,7 @@ export const startBot = (
     const { emoji, message } = reaction;
     const { attachments } = message;
 
-    let thread: AnyThreadChannel;
+    let thread: AnyThreadChannel | null = message.thread;
     const reply = async (msg: string) => {
       if (!thread) {
         thread = await message.startThread({

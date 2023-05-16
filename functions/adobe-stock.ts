@@ -109,11 +109,14 @@ const cleanup = async (page: Page): Promise<void> => {
 
 const clickNotNow = async (page: Page) => {
   try {
-    await page.waitForXPath('//span[contains(text(), "Not now")]', {
-      visible: true,
-      timeout: 1000,
-    });
-    await page.click('//*[contains(text(), "Not now")]');
+    await page.waitForSelector(
+      '::-p-xpath(//span[contains(text(), "Not now")])',
+      {
+        visible: true,
+        timeout: 1000,
+      }
+    );
+    await page.click('::-p-xpath(//span[contains(text(), "Not now")])');
   } catch (err) {
     // do nothing
   }
@@ -205,30 +208,29 @@ const writeImageMetadata = async (
   title: string,
   keywords: string[],
   category: number,
-  imageFile: FileDescriptor,
-  workDir: string
+  imageFile: FileDescriptor
 ): Promise<string> => {
-  const csv = await writeCsv(
-    {
-      header: (
-        ["filename", "title", "keywords", "category", "releases"] as const
-      ).map((id) => ({ id, title: capitalize(id) })),
-      records: [
-        {
-          filename: imageFile.base,
-          title,
-          keywords,
-          category,
-          releases: [],
-        },
-      ],
-      output: join(
-        imageFile.dir,
-        getTaggedFileName(setFileExtension(imageFile.base, "csv"), "metadata")
-      ),
-    },
-    { workDir }
-  );
+  const csv = await writeCsv({
+    header: (
+      ["filename", "title", "keywords", "category", "releases"] as const
+    ).map((id) => ({ id, title: capitalize(id) })),
+    records: [
+      {
+        filename: imageFile.base,
+        title,
+        keywords,
+        category,
+        releases: [],
+      },
+    ],
+    output: join(
+      imageFile.dir,
+      getTaggedFileName(
+        setFileExtension(imageFile.base, "csv"),
+        "adobe-stock-metadata"
+      )
+    ),
+  });
 
   return csv;
 };
@@ -261,19 +263,18 @@ export async function* adobeStockUpload(
 
     await adobeStockUploadImage(page, imagePath);
 
-    yield "Uploaded image";
+    yield "Uploaded image to Adobe Stock";
 
     const imageFile = getFileDescriptor(imagePath);
     const csvPath = await writeImageMetadata(
       title,
       keywords,
       category,
-      imageFile,
-      workDir
+      imageFile
     );
     await adobeStockUploadCsv(page, csvPath);
 
-    yield "Uploaded CSV";
+    yield "Uploaded CSV to Adobe Stock";
 
     await click(page, AI_CONTENT_CHECKBOX);
     await select(page, FILE_TYPE_SELECT, ILLUSTRATIONS_FILE_TYPE);
@@ -288,7 +289,8 @@ export async function* adobeStockUpload(
       await page.waitForSelector(SUBMISSON_MESSAGE);
     });
 
-    yield "Submitted image";
+    yield "Submitted image to Adobe Stock";
+    return;
   } finally {
     await browser.close();
     release();
