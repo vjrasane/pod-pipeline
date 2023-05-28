@@ -1,4 +1,4 @@
-$.evalFile(Folder.temp + "/mockup-env");
+$.evalFile(Folder.temp + "/mockup.env");
 
 var imageFile = MOCKUP_INPUT;
 var mockupFile = MOCKUP_FILE;

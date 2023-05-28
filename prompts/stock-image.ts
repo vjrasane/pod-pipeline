@@ -16,6 +16,11 @@ The description can be at most 200 characters in length.
 export const keywordsPrompt = `
 Come up with keywords for the image based on the previous prompt and title.
 
+- Do not mention aspect ratio or other attributes related to the size of the image.
+- Do not name any artists or styles as inspiration
+- Do not mention any camera settings, focus, lense sizes or brands
+- Avoid non-english words or extremely uncommon words.
+
 The keywords should vary in length. Short ones should focus on general and vague aspects of the image. Long ones should focus on the details.
 
 Continue using language that has a higher chance of selling stock images and ranks well in search engines, but keep it descriptive rather than speculative.

@@ -4,6 +4,7 @@ import {
   OpenAIApi,
 } from "openai";
 import { OpenAiConfig } from "../config";
+import { sleep } from "../utils";
 
 export const initOpenAi = ({
   openAiApiKey,
@@ -79,18 +80,26 @@ export class Conversation {
   say = async (
     content: string,
     maxTokens: number,
-    role: "user" | "system" = "user"
+    role: "user" | "system" = "user",
+    retries = 5,
+    retryDelay = 1000
   ): Promise<ChatCompletionResponseMessage> => {
-    this.messages = [...this.messages, { role, content }];
-    const response = await this.openai.createChatCompletion({
-      model: "gpt-3.5-turbo",
-      messages: this.messages,
-      max_tokens: maxTokens,
-      temperature: 0,
-    });
-    const [{ message }] = response.data.choices;
-    if (!message) throw new Error("No answer from chat completion");
-    this.messages = [...this.messages, message];
-    return message;
+    try {
+      const messages = [...this.messages, { role, content }];
+      const response = await this.openai.createChatCompletion({
+        model: "gpt-3.5-turbo",
+        messages,
+        max_tokens: maxTokens,
+        temperature: 0,
+      });
+      const [{ message }] = response.data.choices;
+      if (!message) throw new Error("No answer from chat completion");
+      this.messages = [...messages, message];
+      return message;
+    } catch (err) {
+      if (retries <= 0) throw err;
+      await sleep(retryDelay);
+      return this.say(content, maxTokens, role, retries - 1, retryDelay * 2);
+    }
   };
 }

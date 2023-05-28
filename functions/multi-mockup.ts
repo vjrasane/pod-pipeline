@@ -5,6 +5,7 @@ import { tmpdir } from "os";
 import { promisify } from "util";
 import { copyFile, existsSync, readFileSync, writeFile } from "fs";
 import { Config } from "../config";
+import { mapValues } from "lodash/fp";
 
 const toUnixPath = (path: string): string => {
   return path.split(sep).join("/");
@@ -12,13 +13,13 @@ const toUnixPath = (path: string): string => {
 
 const semaphore = new Semaphore(1);
 
-const MOCKUP_ENV_FILE = join(tmpdir(), "mockup.env");
+const MOCKUP_ENV_FILE = join(tmpdir(), "multi-mockup.env");
 
-const droplet = resolve(__dirname, "../photoshop/mockup.exe");
+const droplet = resolve(__dirname, "../photoshop/multi-mockup.exe");
 const dummy = resolve(__dirname, "../photoshop/dummy.png");
 
-const mockup = async (
-  input: string,
+const multiMockup = async (
+  inputs: Record<string, string>,
   output: string,
   mockup: string
 ): Promise<string> => {
@@ -33,7 +34,7 @@ const mockup = async (
   const release = await semaphore.acquire();
 
   const mockupEnv = `
-    var MOCKUP_INPUT = '${toUnixPath(input)}';
+    var MOCKUP_INPUTS = ${JSON.stringify(mapValues(toUnixPath, inputs))};
     var MOCKUP_FILE = '${toUnixPath(mockup)}';
   `;
   await promisify(writeFile)(MOCKUP_ENV_FILE, mockupEnv, "utf-8");
@@ -59,4 +60,4 @@ const mockup = async (
   return output;
 };
 
-export default mockup;
+export default multiMockup;

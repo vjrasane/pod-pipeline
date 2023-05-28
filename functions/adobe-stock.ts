@@ -12,8 +12,10 @@ import {
   getFileDescriptor,
   getTaggedFileName,
   setFileExtension,
+  sleep,
 } from "../utils";
 import Semaphore from "semaphore-promise";
+import { click, input, select } from "../puppeteer/utils";
 
 puppeteer.use(StealthPlugin());
 puppeteer.use(AdblockerPlugin());
@@ -56,33 +58,6 @@ const AI_CONTENT_CHECKBOX =
 const AUTO_CATEGORY_BUTTON =
   '::-p-xpath(//span[contains(text(), "Refresh auto-category")])';
 const SELECT_ALL_BUTTON = '::-p-xpath(//span[contains(text(), "Select All")])';
-
-const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
-
-const input = async (
-  page: Page,
-  selector: string,
-  text: string,
-  delay: number = 0
-) => {
-  await page.waitForSelector(selector, {
-    visible: true,
-  });
-  await sleep(delay);
-  await page.type(selector, text, {
-    delay: 10,
-  });
-};
-
-const click = async (page: Page, selector: string) => {
-  await page.waitForSelector(selector, { visible: true });
-  await page.click(selector);
-};
-
-const select = async (page: Page, selector: string, value: string) => {
-  await page.waitForSelector(selector, { visible: true });
-  await page.select(selector, value);
-};
 
 const deleteFiles = async (page: Page): Promise<void> => {
   const images = await page.$$(UPLOADED_IMAGE_TILE);
@@ -244,26 +219,35 @@ type AdobeUploadParameters = {
 
 const semaphore = new Semaphore(1);
 
+const LOG_PREFIX = "[adobe-stock] ";
+
 export async function* adobeStockUpload(
   { image, title, category, keywords }: AdobeUploadParameters,
   { adobeStockPassword, adobeStockUsername, workDir }: AdobeConfig & Config
 ): AsyncIterable<string> {
   const release = await semaphore.acquire();
   const browser = await puppeteer.launch({ headless: false });
+  const page = await browser.newPage();
   try {
-    const page = await browser.newPage();
     await page.goto("https://contributor.stock.adobe.com/");
 
     const imagePath = resolve(workDir, image);
     await adobeStockSignin(page, adobeStockUsername, adobeStockPassword);
 
-    yield "Signed in to Adobe Stock";
+    yield LOG_PREFIX + "Signed in";
 
     await cleanup(page);
 
-    await adobeStockUploadImage(page, imagePath);
+    await retryWithWorkaround(
+      async () => {
+        await adobeStockUploadImage(page, imagePath);
+      },
+      async () => {
+        await page.reload({ waitUntil: "domcontentloaded" });
+      }
+    );
 
-    yield "Uploaded image to Adobe Stock";
+    yield LOG_PREFIX + "Uploaded image";
 
     const imageFile = getFileDescriptor(imagePath);
     const csvPath = await writeImageMetadata(
@@ -272,9 +256,16 @@ export async function* adobeStockUpload(
       category,
       imageFile
     );
-    await adobeStockUploadCsv(page, csvPath);
+    await retryWithWorkaround(
+      async () => {
+        await adobeStockUploadCsv(page, csvPath);
+      },
+      async () => {
+        await page.reload({ waitUntil: "domcontentloaded" });
+      }
+    );
 
-    yield "Uploaded CSV to Adobe Stock";
+    yield LOG_PREFIX + "Uploaded CSV";
 
     await click(page, AI_CONTENT_CHECKBOX);
     await select(page, FILE_TYPE_SELECT, ILLUSTRATIONS_FILE_TYPE);
@@ -289,10 +280,15 @@ export async function* adobeStockUpload(
       await page.waitForSelector(SUBMISSON_MESSAGE);
     });
 
-    yield "Submitted image to Adobe Stock";
-    return;
+    yield LOG_PREFIX + "Submitted image";
+  } catch (err) {
+    await page.screenshot({
+      path: resolve(process.cwd(), "./adobe-stock-failure.png"),
+    });
+    yield LOG_PREFIX + "Failed: " + String(err);
   } finally {
     await browser.close();
     release();
+    return;
   }
 }

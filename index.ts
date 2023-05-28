@@ -2,16 +2,20 @@ import { maybe, nonEmptyString } from "decoders";
 import { Message, ReactionListener, startBot } from "./functions/discord";
 import dotenv from "dotenv";
 import axios from "axios";
-import { join } from "path";
+import { join, resolve } from "path";
 import { mkdir, rm, writeFile } from "fs";
 import { promisify } from "util";
-import { snakeCase, truncate } from "lodash/fp";
 import { stockImagePipeline } from "./pipelines/stock-image.pipeline";
+import { digitialPaintingPipeline } from "./pipelines/digital-painting.pipeline";
 
 dotenv.config();
 
+const workDir = maybe(nonEmptyString, process.cwd()).verify(
+  process.env.WORK_DIR
+);
+
 const config = {
-  workDir: maybe(nonEmptyString, process.cwd()).verify(process.env.WORK_DIR),
+  workDir,
   openAiApiKey: nonEmptyString.verify(process.env.OPENAI_API_KEY),
   openAiOrganizationId: nonEmptyString.verify(
     process.env.OPENAI_ORGANIZATION_ID
@@ -25,6 +29,8 @@ const config = {
     process.env.SHUTTERSTOCK_PASSWORD
   ),
   discordBotToken: nonEmptyString.verify(process.env.DISCORD_BOT_TOKEN),
+  credentialsFile: resolve(workDir, "./credentials.json"),
+  tokenFile: resolve(workDir, "./token.json"),
 };
 
 const downloadImage = async (
@@ -76,11 +82,34 @@ const onStockReaction: ReactionListener = async (
   }
 };
 
+const onPaintingReaction: ReactionListener = async (
+  reaction,
+  reply
+): Promise<void> => {
+  const { message } = reaction;
+  const outputDir = join(config.workDir, message.id);
+  try {
+    const image = await downloadImage(message, outputDir);
+    const prompt = getPrompt(message);
+    await reply(`Downloaded image`);
+    const iterable = digitialPaintingPipeline(image, prompt, outputDir, config);
+    for await (const status of iterable) {
+      await reply(status);
+    }
+
+    await reply("Done!");
+  } catch (err) {
+    await reply(`Failed to process: ${err}`);
+  }
+};
+
 const onReaction: ReactionListener = async (reaction, reply): Promise<void> => {
   const { emoji } = reaction;
   switch (emoji) {
     case "📈":
       return onStockReaction(reaction, reply);
+    case "🖼️":
+      return onPaintingReaction(reaction, reply);
     default:
       console.log("Unsupprted emoji reaction: " + reaction.emoji);
   }

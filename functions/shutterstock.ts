@@ -10,19 +10,17 @@ import {
   getFileDescriptor,
   getTaggedFileName,
   setFileExtension,
+  sleep,
 } from "../utils";
 import { writeCsv } from "./csv";
 import { capitalize } from "lodash/fp";
-import { clickByText } from "../puppeteer/utils";
+import { clickByText, containsTextSelector } from "../puppeteer/utils";
 import { ShutterstockCategory } from "../prompts/stock-image";
 
 const _delete = require("../puppeteer/shutterstock/delete");
-const refreshNow = require("../puppeteer/shutterstock/refresh-now");
 
 puppeteer.use(StealthPlugin());
 puppeteer.use(AdblockerPlugin());
-
-const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 const input = async (
   page: Page,
@@ -43,27 +41,6 @@ const click = async (page: Page, selector: string) => {
   await page.waitForSelector(selector, { visible: true, timeout: 10000 });
   await page.click(selector);
 };
-
-const retryWithWorkaround = async <T>(
-  action: () => Promise<T>,
-  workaround: () => Promise<unknown>,
-  retries: number = 3
-): Promise<T> => {
-  try {
-    const result = await action();
-    return result;
-  } catch (err) {
-    if (retries <= 0) throw err;
-    await suppress(workaround());
-    return await retryWithWorkaround(action, workaround, retries - 1);
-  }
-};
-
-const retryWithDelay = async <T>(
-  action: () => Promise<T>,
-  delay: number = 1000,
-  retries: number = 3
-): Promise<T> => retryWithWorkaround(action, () => sleep(delay), retries);
 
 const writeImageMetadata = async (
   description: string,
@@ -160,24 +137,6 @@ const shutterStockUploadCsv = async (page: Page, csvPath: string) => {
   });
 };
 
-const suppress = async <T>(
-  promise: Promise<T> | (() => Promise<T>)
-): Promise<void> => {
-  try {
-    if (typeof promise === "function") {
-      await promise();
-      return;
-    }
-    await promise;
-    return;
-  } catch (err) {
-    // suppress error
-  }
-};
-
-const containsTextSelector = (element: string, text: string) =>
-  `::-p-xpath(//${element}[contains(text(), "${text}")])`;
-
 const selectAll = async (page: Page) => {
   const MULTI_SELECT_BUTTON = containsTextSelector("span", "Multi-select");
   const SELECT_ALL_BUTTON = `span[data-icon="check"]`;
@@ -235,6 +194,7 @@ const waitForUploader = async (page: Page) => {
 
 const closeUploaderModals = async (page: Page) => {
   await suppress(clickByText(page, "Got It!"));
+  await suppress(clickByText(page, "I'm Ready"));
 };
 
 const shutterstockUploadImage = async (page: Page, imagePath: string) => {
@@ -269,8 +229,13 @@ const shutterstockUploadImage = async (page: Page, imagePath: string) => {
   );
 
   await retryWithWorkaround(
-    () => refreshNow(page),
-    () => closeEditorModals(page)
+    async () => {
+      await clickByText(page, "Refresh now");
+    },
+    async () => {
+      await page.reload({ waitUntil: "domcontentloaded" });
+      await closeEditorModals(page);
+    }
   );
 };
 
@@ -284,7 +249,7 @@ type ShutterstockUploadParameters = {
 };
 const semaphore = new Semaphore(1);
 
-const SUBMIT_BUTTON = 'span[data-test-ref="submit-button"]';
+const LOG_PREFIX = "[shutterstock] ";
 
 export async function* shutterstockUpload(
   { imagePath, title, categories, keywords }: ShutterstockUploadParameters,
@@ -298,7 +263,7 @@ export async function* shutterstockUpload(
 
     await shutterstockSignin(page, shutterstockUsername, shutterstockPassword);
 
-    yield "Signed in to Shutterstock";
+    yield LOG_PREFIX + "Signed in";
 
     await waitForEditor(page);
 
@@ -315,7 +280,7 @@ export async function* shutterstockUpload(
 
     await shutterstockUploadImage(page, imagePath);
 
-    yield "Uploaded image to Shutterstock";
+    yield LOG_PREFIX + "Uploaded image";
 
     const csvPath = await writeImageMetadata(
       title,
@@ -330,36 +295,47 @@ export async function* shutterstockUpload(
       () => closeEditorModals(page)
     );
 
-    yield "Uploaded CSV to Shutterstock";
-
-    await waitForEditor(page);
-
-    await waitForEditor(page);
-    await retryWithWorkaround(
-      async () => {
-        await selectAll(page);
-      },
-      () => page.reload({ waitUntil: "domcontentloaded" })
-    );
+    yield LOG_PREFIX + "Uploaded CSV";
 
     await retryWithWorkaround(
       async () => {
-        await page.$eval(SUBMIT_BUTTON, (e) => e.click());
-        await clickByText(page, "Submit");
-        await page.waitForSelector(SUBMIT_BUTTON, {
+        await waitForEditor(page);
+        await page.waitForSelector("text/Start here", {
           hidden: true,
+          timeout: 5000,
         });
       },
-      () => closeEditorModals(page)
+      () =>
+        page.goto("https://submit.shutterstock.com/edit", {
+          waitUntil: "domcontentloaded",
+        })
     );
 
-    yield "Submitted image to Shutterstock";
-    return;
-  } finally {
+    await selectAll(page);
+
+    await retryWithWorkaround(
+      async () => {
+        await clickByText(page, "Submit");
+        await page.waitForSelector("text/Content submitted!", {
+          visible: true,
+          timeout: 5000,
+        });
+      },
+      async () => {
+        await closeEditorModals(page);
+        await clickByText(page, "Mark all keywords as correct");
+      }
+    );
+
+    yield LOG_PREFIX + "Submitted image";
+  } catch (err) {
     await page.screenshot({
-      path: resolve(process.cwd(), "./failure.png"),
+      path: resolve(process.cwd(), "./shutterstock-failure.png"),
     });
+    yield LOG_PREFIX + "Failed: " + String(err);
+  } finally {
     await browser.close();
     release();
+    return;
   }
 }

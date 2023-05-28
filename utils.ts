@@ -107,6 +107,9 @@ export const getDirectoryText = (
   return textFile ? getFileDescriptor(join(filePath, textFile)) : undefined;
 };
 
+export const sleep = (ms: number) =>
+  new Promise((resolve) => setTimeout(resolve, ms));
+
 export const combineAsyncIterables = async function* <T>(
   asyncIterables: AsyncIterable<T>[]
 ): AsyncGenerator<T> {

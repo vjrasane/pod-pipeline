@@ -53,6 +53,7 @@ const generateAdobeStockCategory = async (
 ): Promise<number> => {
   const categoryMessage = await conversation.say(adobeStockCategoryPrompt, 1);
   const imageCategory = nonEmptyString
+    .transform((str) => trim(str, "."))
     .transform((str) => parseInt(str))
     .then(positiveInteger.decode)
     .refine((num) => inRange(1, 21, num), "Number not between 1 and 21")
@@ -72,7 +73,7 @@ const generateShutterstockCategories = async (
   );
   const imageCategories = nonEmptyString
     .transform((str) => str.split(","))
-    .transform((arr) => arr.map((str) => str.trim()))
+    .transform((arr) => arr.map((str) => trim(str.trim(), ".")))
     .transform((arr) => take(arr, 2))
     .then(
       either(
@@ -166,24 +167,21 @@ export async function* stockImagePipeline(
 
   yield `Wrote image keywords: ${imageKeywords}`;
 
-  const [adobeStockConversation, shutterstockConversation] = [
-    conversation.duplicate(),
-    conversation.duplicate(),
-  ];
+  const [adobeStockConversation] = [conversation.duplicate()];
 
   const adobeStockCategory = await generateAdobeStockCategory(
     adobeStockConversation
   );
-  const shuttestockCategories = await generateShutterstockCategories(
-    shutterstockConversation
-  );
+  // const shuttestockCategories = await generateShutterstockCategories(
+  //   shutterstockConversation
+  // );
 
   yield `Wrote Adobe Stock image category: ${
     ADOBE_STOCK_CATEGORIES[
       adobeStockCategory as keyof typeof ADOBE_STOCK_CATEGORIES
     ]
   }`;
-  yield `Wrote Shutterstock categories: ${shuttestockCategories.join(", ")}`;
+  // yield `Wrote Shutterstock categories: ${shuttestockCategories.join(", ")}`;
 
   const resultFile = getFileDescriptor(converted);
 
@@ -197,15 +195,15 @@ export async function* stockImagePipeline(
       },
       config
     ),
-    shutterstockUpload(
-      {
-        imagePath: resultFile.path,
-        title: imageTitle,
-        categories: shuttestockCategories,
-        keywords: imageKeywords,
-      },
-      config
-    ),
+    // shutterstockUpload(
+    //   {
+    //     imagePath: resultFile.path,
+    //     title: imageTitle,
+    //     categories: shuttestockCategories,
+    //     keywords: imageKeywords,
+    //   },
+    //   config
+    // ),
   ]);
 
   for await (const status of generator) {
