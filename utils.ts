@@ -83,9 +83,11 @@ export const setFileExtension = (
 };
 
 export const getFileDescriptor = (filePath: string) => {
+  const parsed = parse(filePath);
   return {
-    ...parse(filePath),
+    ...parsed,
     path: filePath,
+    dirname: parse(parsed.dir).name,
   };
 };
 

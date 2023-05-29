@@ -1,5 +1,13 @@
 import { nonEmptyString, positiveInteger } from "decoders";
-import { mkdtemp, mkdtempSync, readdirSync, readFileSync, rm, rmdir } from "fs";
+import {
+  mkdtemp,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rename,
+  rm,
+  rmdir,
+} from "fs";
 import { assignInAllWith, max, maxBy } from "lodash/fp";
 import { chat } from "../functions/chat";
 import forEachFile from "../functions/for-each-file";
@@ -22,6 +30,7 @@ import mockup from "../functions/mockup";
 import { driveUpload, driveShare } from "../functions/drive";
 import { Config, GoogleApiConfig, OpenAiConfig } from "../config";
 import multiMockup from "../functions/multi-mockup";
+import { addLinkToPdf, getPageDimensions } from "../functions/pdf";
 
 const PIXELS_PER_INCH = 300;
 const UPSCALE_MULTIPLIER = 4;
@@ -158,9 +167,34 @@ export async function* digitialPaintingPipeline(
 
   yield "Created aspect ratio mockup";
 
-  const listingId = "listingId";
-  const listingFolderPath = `Listings/${listingId}`;
+  const uploadId = imageDescriptor.dirname;
+  const listingFolderPath = `Listings/${uploadId}`;
   const sharedFolderPath = `${listingFolderPath}/Shared`;
 
+  await driveUpload(sharedFolderPath, cropped.map(getFileDescriptor), config);
+  yield "Uploaded to drive";
+
+  const link = await driveShare(sharedFolderPath, config);
+
+  yield "Created a share link";
+
+  const downloadTemplate = resolve(
+    __dirname,
+    "../mockups/download-template.pdf"
+  );
+  const [pdfWidth] = await getPageDimensions(downloadTemplate);
+  const downloadFile = await addLinkToPdf(
+    downloadTemplate,
+    join(outputDir, "download.pdf"),
+    link,
+    [0, 280, 0 + pdfWidth, 280 + 80]
+  );
+
+  yield "Created download file";
+
+  await promisify(rename)(
+    resolve(__dirname, "../mockups/print-sizes.png"),
+    join(outputDir, "print-sizes.png")
+  );
   return;
 }

@@ -13,3 +13,9 @@ dist
 credentials.json
 token.json
 output
+*.pdf
+*.html
+*.gif
+*.mp4
+*.csv
+*.jpeg

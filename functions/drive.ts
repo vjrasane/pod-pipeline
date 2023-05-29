@@ -1,5 +1,4 @@
-import { Config, GoogleApiConfig } from "../config";
-import { resolve } from "path";
+import { GoogleApiConfig } from "../config";
 import { FileDescriptor } from "../utils";
 import { drive_v3, google } from "googleapis";
 import { authenticate } from "@google-cloud/local-auth";
@@ -7,13 +6,63 @@ import { createReadStream, readFileSync, writeFileSync } from "fs";
 import { OAuth2Client } from "google-auth-library";
 import { compact } from "lodash/fp";
 
-const getOrCreateFolder = async (
+async function saveCredentials(
+  client: OAuth2Client,
+  { tokenFile, credentialsFile }: GoogleApiConfig
+): Promise<void> {
+  const content = readFileSync(credentialsFile, "utf-8");
+  const keys = JSON.parse(content);
+  const key = keys.installed || keys.web;
+  const payload = JSON.stringify({
+    type: "authorized_user",
+    client_id: key.client_id,
+    client_secret: key.client_secret,
+    refresh_token: client.credentials.refresh_token,
+  });
+  writeFileSync(tokenFile, payload);
+}
+
+const initCredentials = async (config: GoogleApiConfig) => {
+  const client = await authenticate({
+    scopes: ["https://www.googleapis.com/auth/drive"],
+    keyfilePath: config.credentialsFile,
+  });
+  if (client.credentials) {
+    await saveCredentials(client, config);
+  }
+  return client;
+};
+
+async function loadSavedCredentialsIfExist(
+  config: GoogleApiConfig
+): Promise<OAuth2Client | null> {
+  try {
+    const content = readFileSync(config.tokenFile, "utf-8");
+    const credentials = JSON.parse(content);
+    return google.auth.fromJSON(credentials) as OAuth2Client;
+  } catch (err) {
+    return null;
+  }
+}
+
+async function getClient(config: GoogleApiConfig) {
+  let client = await loadSavedCredentialsIfExist(config);
+  if (client) return client;
+  return await initCredentials(config);
+}
+
+const initDrive = async (authClient: OAuth2Client) => {
+  const drive = google.drive({ version: "v3", auth: authClient });
+  return drive;
+};
+
+const getFile = async (
   drive: drive_v3.Drive,
-  folderName: string,
+  name: string,
   parentId?: string
-): Promise<{ id: string }> => {
+): Promise<{ id: string } | undefined> => {
   const q = compact([
-    `name = '${folderName}'`,
+    `name = '${name}'`,
     parentId && `'${parentId}' in parents`,
     "trashed = false",
   ]).join(" and ");
@@ -24,12 +73,20 @@ const getOrCreateFolder = async (
   });
   const files = res.data.files;
 
-  const dir = files?.find(
+  return files?.find(
     (file) =>
-      file.name === folderName &&
+      file.name === name &&
       !file.trashed &&
       (!parentId || file.parents?.some((parent) => parent === parentId))
-  );
+  ) as any;
+};
+
+const getOrCreateFolder = async (
+  drive: drive_v3.Drive,
+  folderName: string,
+  parentId?: string
+): Promise<{ id: string }> => {
+  const dir = getFile(drive, folderName, parentId);
   if (dir) return dir as any;
 
   /* @ts-ignore */
@@ -48,50 +105,6 @@ const getOrCreateFolder = async (
   return result.data as any;
 };
 
-const initDrive = async ({ tokenFile, credentialsFile }: GoogleApiConfig) => {
-  async function loadSavedCredentialsIfExist(): Promise<OAuth2Client | null> {
-    try {
-      const content = readFileSync(tokenFile, "utf-8");
-      const credentials = JSON.parse(content);
-      return google.auth.fromJSON(credentials) as OAuth2Client;
-    } catch (err) {
-      return null;
-    }
-  }
-
-  async function saveCredentials(client: OAuth2Client): Promise<void> {
-    const content = readFileSync(credentialsFile, "utf-8");
-    const keys = JSON.parse(content);
-    const key = keys.installed || keys.web;
-    const payload = JSON.stringify({
-      type: "authorized_user",
-      client_id: key.client_id,
-      client_secret: key.client_secret,
-      refresh_token: client.credentials.refresh_token,
-    });
-    writeFileSync(tokenFile, payload);
-  }
-
-  async function authorize() {
-    let client = await loadSavedCredentialsIfExist();
-    if (client) {
-      return client;
-    }
-    client = await authenticate({
-      scopes: ["https://www.googleapis.com/auth/drive"],
-      keyfilePath: credentialsFile,
-    });
-    if (client.credentials) {
-      await saveCredentials(client);
-    }
-    return client;
-  }
-
-  const authClient = await authorize();
-  const drive = google.drive({ version: "v3", auth: authClient });
-  return drive;
-};
-
 const getOrCreateFolderPath = async (
   drive: drive_v3.Drive,
   folderPath: string
@@ -108,17 +121,11 @@ const getOrCreateFolderPath = async (
   return folder;
 };
 
-type DriveUploadParameters = {
-  folderPath: string;
-  files: FileDescriptor[];
-};
-
-export const driveUpload = async (
-  { folderPath, files }: DriveUploadParameters,
-  { workDir, ...googleConfig }: GoogleApiConfig & Config
-): Promise<string> => {
-  const drive = await initDrive(googleConfig);
-
+const execUpload = async (
+  drive: drive_v3.Drive,
+  folderPath: string,
+  files: FileDescriptor[]
+) => {
   const folder = await getOrCreateFolderPath(drive, folderPath);
 
   const getMimeType = (file: FileDescriptor) => {
@@ -136,8 +143,12 @@ export const driveUpload = async (
   };
 
   const uploadFile = async (file: FileDescriptor) => {
-    const filePath = resolve(workDir, file.path);
-    console.log("Uploading " + filePath);
+    const existing = await getFile(drive, file.base, folder.id);
+    if (existing) {
+      console.log(`Upload '${file.base}' already exists`);
+      return;
+    }
+    console.log("Uploading " + file.path);
     await drive.files.create({
       fields: "id",
       requestBody: {
@@ -146,7 +157,7 @@ export const driveUpload = async (
         parents: [folder.id],
       },
       media: {
-        body: createReadStream(filePath),
+        body: createReadStream(file.path),
         mimeType: getMimeType(file),
       },
     });
@@ -156,15 +167,33 @@ export const driveUpload = async (
   return folder.id;
 };
 
-type DriveShareParameters = {
-  folderPath: string;
-};
+const withDrive =
+  (config: GoogleApiConfig) =>
+  async <T>(action: (drive: drive_v3.Drive) => Promise<T>): Promise<T> => {
+    try {
+      const authClient = await getClient(config);
+      const drive = await initDrive(authClient);
+      return await action(drive);
+    } catch (err) {
+      console.error(err);
+      if ((err as Error).message == "invalid_grant") {
+        const authClient = await initCredentials(config);
+        const drive = await initDrive(authClient);
+        return await action(drive);
+      }
+      throw err;
+    }
+  };
 
-export const driveShare = async (
-  { folderPath }: DriveShareParameters,
+export const driveUpload = async (
+  folderPath: string,
+  files: FileDescriptor[],
   config: GoogleApiConfig
 ): Promise<string> => {
-  const drive = await initDrive(config);
+  return withDrive(config)((drive) => execUpload(drive, folderPath, files));
+};
+
+const execShare = async (drive: drive_v3.Drive, folderPath: string) => {
   const folder = await getOrCreateFolderPath(drive, folderPath);
   await drive.permissions.create({
     fileId: folder.id,
@@ -184,4 +213,11 @@ export const driveShare = async (
   if (!webViewLink)
     throw new Error("Could not retrieve webViewLink for folder: " + folderPath);
   return webViewLink;
+};
+
+export const driveShare = async (
+  folderPath: string,
+  config: GoogleApiConfig
+): Promise<string> => {
+  return withDrive(config)((drive) => execShare(drive, folderPath));
 };
