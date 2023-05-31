@@ -21,3 +21,7 @@ Add to shortcut properties:
   - override save and set output file to `Temp\{doc name}-output{ext}`
 - Record droplet for `multi-mockup.jsx` and save as `photoshop/multi-mockup.exe`
   - override save and set output file to `Temp\{doc name}-output{ext}`
+
+# Canvas
+
+- Sharp & Canvas libraries require Cairo https://www.cairographics.org/

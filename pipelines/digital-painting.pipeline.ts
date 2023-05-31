@@ -1,5 +1,6 @@
 import { nonEmptyString, positiveInteger } from "decoders";
 import {
+  copyFile,
   mkdtemp,
   mkdtempSync,
   readdirSync,
@@ -31,6 +32,8 @@ import { driveUpload, driveShare } from "../functions/drive";
 import { Config, GoogleApiConfig, OpenAiConfig } from "../config";
 import multiMockup from "../functions/multi-mockup";
 import { addLinkToPdf, getPageDimensions } from "../functions/pdf";
+import { createGif } from "../functions/gif";
+import { gifToVideo } from "../functions/video";
 
 const PIXELS_PER_INCH = 300;
 const UPSCALE_MULTIPLIER = 4;
@@ -85,11 +88,8 @@ export async function* digitialPaintingPipeline(
 
   yield "Upscaled image";
 
-  const cropped = await forEachValue(
-    {
-      values: ASPECT_RATIOS,
-    },
-    ({ w, h, name }) => {
+  const cropped = await Promise.all(
+    ASPECT_RATIOS.map(({ w, h, name }) => {
       const fileName = `${name}${imageDescriptor.ext}`;
       return resize(
         {
@@ -100,13 +100,15 @@ export async function* digitialPaintingPipeline(
         },
         config
       );
-    }
+    })
   );
+  const [cropped3x2, cropped4x3, cropped5x4, cropped14x11, croppedIso] =
+    cropped;
 
   yield "Cropped image";
 
   await mockup(
-    join(outputDir, "iso.png"),
+    croppedIso,
     join(outputDir, "mockup-iso-mitarts.png"),
     resolve(__dirname, "../mockups/painting-iso-mitarts.psd")
   );
@@ -114,7 +116,7 @@ export async function* digitialPaintingPipeline(
   yield "Created ISO mockup one";
 
   await mockup(
-    join(outputDir, "iso.png"),
+    croppedIso,
     join(outputDir, "mockup-iso-northprints.png"),
     resolve(__dirname, "../mockups/painting-iso-northprints.psd")
   );
@@ -122,7 +124,7 @@ export async function* digitialPaintingPipeline(
   yield "Created ISO mockup two";
 
   await mockup(
-    join(outputDir, "iso.png"),
+    croppedIso,
     join(outputDir, "mockup-passepartou-iso.png"),
     resolve(__dirname, "../mockups/painting-passepartou-iso.psd")
   );
@@ -130,7 +132,7 @@ export async function* digitialPaintingPipeline(
   yield "Created passepartou mockup";
 
   await mockup(
-    join(outputDir, "4x3.png"),
+    cropped4x3,
     join(outputDir, "mockup-4x3.png"),
     resolve(__dirname, "../mockups/painting-4x3.psd")
   );
@@ -138,7 +140,7 @@ export async function* digitialPaintingPipeline(
   yield "Created 4x3 mockup";
 
   await mockup(
-    join(outputDir, "3x2.png"),
+    cropped3x2,
     join(outputDir, "mockup-center-3x2.png"),
     resolve(__dirname, "../mockups/painting-center-3x2.psd")
   );
@@ -146,7 +148,7 @@ export async function* digitialPaintingPipeline(
   yield "Created center mockup";
 
   await mockup(
-    join(outputDir, "3x2.png"),
+    cropped3x2,
     join(outputDir, "mockup-closeup-3x2.png"),
     resolve(__dirname, "../mockups/painting-closeup-3x2.psd")
   );
@@ -155,11 +157,11 @@ export async function* digitialPaintingPipeline(
 
   await multiMockup(
     {
-      graphic_3x2: join(outputDir, "3x2.png"),
-      graphic_4x3: join(outputDir, "4x3.png"),
-      graphic_5x4: join(outputDir, "5x4.png"),
-      graphic_14x11: join(outputDir, "14x11.png"),
-      graphic_iso: join(outputDir, "iso.png"),
+      graphic_3x2: cropped3x2,
+      graphic_4x3: cropped4x3,
+      graphic_5x4: cropped5x4,
+      graphic_14x11: cropped14x11,
+      graphic_iso: croppedIso,
     },
     join(outputDir, "mockup-aspect-artios.png"),
     resolve(__dirname, "../mockups/painting-aspect-ratios.psd")
@@ -192,9 +194,22 @@ export async function* digitialPaintingPipeline(
 
   yield "Created download file";
 
-  await promisify(rename)(
+  const gifFile = await createGif(
+    cropped3x2,
+    join(outputDir, "image-with-logo.gif")
+  );
+
+  yield "Created gif";
+
+  const videoFile = await gifToVideo(gifFile, join(outputDir, "video.mp4"));
+
+  yield "Created video";
+
+  await promisify(copyFile)(
     resolve(__dirname, "../mockups/print-sizes.png"),
     join(outputDir, "print-sizes.png")
   );
+
+  yield "Copied miscellaneous files";
   return;
 }

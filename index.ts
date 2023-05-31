@@ -1,3 +1,8 @@
+// ensure canvas is loaded before sharp
+// otherwise causes weird Error: The specified procedure could not be found.
+import "canvas";
+import "sharp";
+
 import { maybe, nonEmptyString } from "decoders";
 import { Message, ReactionListener, startBot } from "./functions/discord";
 import dotenv from "dotenv";
