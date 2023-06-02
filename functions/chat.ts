@@ -77,6 +77,11 @@ export class Conversation {
     return new Conversation(this.openai, this.messages);
   };
 
+  append = (...messages: ChatCompletionResponseMessage[]): Conversation => {
+    this.messages = [...this.messages, ...messages];
+    return this;
+  };
+
   say = async (
     content: string,
     maxTokens: number,

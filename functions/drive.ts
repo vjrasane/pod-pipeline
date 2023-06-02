@@ -8,9 +8,9 @@ import { compact } from "lodash/fp";
 
 async function saveCredentials(
   client: OAuth2Client,
-  { tokenFile, credentialsFile }: GoogleApiConfig
+  { googleTokenFile, googleCredentialsFile }: GoogleApiConfig
 ): Promise<void> {
-  const content = readFileSync(credentialsFile, "utf-8");
+  const content = readFileSync(googleCredentialsFile, "utf-8");
   const keys = JSON.parse(content);
   const key = keys.installed || keys.web;
   const payload = JSON.stringify({
@@ -19,13 +19,13 @@ async function saveCredentials(
     client_secret: key.client_secret,
     refresh_token: client.credentials.refresh_token,
   });
-  writeFileSync(tokenFile, payload);
+  writeFileSync(googleTokenFile, payload);
 }
 
 const initCredentials = async (config: GoogleApiConfig) => {
   const client = await authenticate({
     scopes: ["https://www.googleapis.com/auth/drive"],
-    keyfilePath: config.credentialsFile,
+    keyfilePath: config.googleCredentialsFile,
   });
   if (client.credentials) {
     await saveCredentials(client, config);
@@ -37,7 +37,7 @@ async function loadSavedCredentialsIfExist(
   config: GoogleApiConfig
 ): Promise<OAuth2Client | null> {
   try {
-    const content = readFileSync(config.tokenFile, "utf-8");
+    const content = readFileSync(config.googleTokenFile, "utf-8");
     const credentials = JSON.parse(content);
     return google.auth.fromJSON(credentials) as OAuth2Client;
   } catch (err) {

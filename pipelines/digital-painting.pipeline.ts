@@ -1,6 +1,7 @@
 import { nonEmptyString, positiveInteger } from "decoders";
 import {
   copyFile,
+  existsSync,
   mkdtemp,
   mkdtempSync,
   readdirSync,
@@ -8,9 +9,10 @@ import {
   rename,
   rm,
   rmdir,
+  writeFileSync,
 } from "fs";
 import { assignInAllWith, max, maxBy } from "lodash/fp";
-import { chat } from "../functions/chat";
+import { Conversation, chat, initOpenAi } from "../functions/chat";
 import forEachFile from "../functions/for-each-file";
 import init, { Options } from "../init";
 import naming from "../prompts/naming";
@@ -29,11 +31,23 @@ import { promisify } from "util";
 import run from "../run";
 import mockup from "../functions/mockup";
 import { driveUpload, driveShare } from "../functions/drive";
-import { Config, GoogleApiConfig, OpenAiConfig } from "../config";
+import { Config, EtsyConfig, GoogleApiConfig, OpenAiConfig } from "../config";
 import multiMockup from "../functions/multi-mockup";
 import { addLinkToPdf, getPageDimensions } from "../functions/pdf";
 import { createGif } from "../functions/gif";
 import { gifToVideo } from "../functions/video";
+import {
+  paintingNaming,
+  paintingTags,
+  paintingDescription,
+  paintingSection,
+} from "../prompts/painting";
+import {
+  createListing,
+  createShopSection,
+  getShopSections,
+} from "../functions/etsy/etsy-api";
+import { EtsySession } from "../functions/etsy/etsy-auth";
 
 const PIXELS_PER_INCH = 300;
 const UPSCALE_MULTIPLIER = 4;
@@ -50,11 +64,88 @@ const MAX_HEIGHT = positiveInteger.verify(max(ASPECT_RATIOS.map(({ h }) => h)));
 
 const MAX_WIDTH = positiveInteger.verify(max(ASPECT_RATIOS.map(({ w }) => w)));
 
+const getTitle = async (
+  conversation: Conversation,
+  prompt: string,
+  outputDir: string
+): Promise<string> => {
+  const titleFile = join(outputDir, "title.txt");
+  const namingPrompt = paintingNaming(prompt);
+
+  if (existsSync(titleFile)) {
+    console.log("Title file already exists");
+    const title = readFileSync(titleFile, "utf-8");
+    conversation.append(
+      { role: "user", content: namingPrompt },
+      {
+        role: "assistant",
+        content: title,
+      }
+    );
+    return title;
+  }
+
+  const { content } = await conversation.say(namingPrompt, 100);
+  writeFileSync(titleFile, content);
+  return content;
+};
+
+const getDescription = async (
+  conversation: Conversation,
+  outputDir: string
+): Promise<string> => {
+  const descriptionFile = join(outputDir, "description.txt");
+  const descriptionPrompt = paintingDescription;
+
+  if (existsSync(descriptionFile)) {
+    console.log("Description file already exists");
+    const description = readFileSync(descriptionFile, "utf-8");
+    conversation.append(
+      { role: "user", content: descriptionPrompt },
+      {
+        role: "assistant",
+        content: description,
+      }
+    );
+    return description;
+  }
+
+  const { content } = await conversation.say(descriptionPrompt, 100);
+  writeFileSync(descriptionFile, content);
+  return content;
+};
+
+const getSection = async (
+  conversation: Conversation,
+  sections: string[],
+  outputDir: string
+): Promise<string> => {
+  const sectionFile = join(outputDir, "section.txt");
+  const sectionPrompt = paintingSection(sections);
+
+  if (existsSync(sectionFile)) {
+    console.log("Section file already exists");
+    const section = readFileSync(sectionFile, "utf-8");
+    conversation.append(
+      { role: "user", content: sectionPrompt },
+      {
+        role: "assistant",
+        content: section,
+      }
+    );
+    return section;
+  }
+
+  const { content } = await conversation.say(sectionPrompt, 100);
+  writeFileSync(sectionFile, content);
+  return content;
+};
+
 export async function* digitialPaintingPipeline(
   imagePath: string,
   prompt: string,
   outputDir: string,
-  config: Config & OpenAiConfig & GoogleApiConfig
+  config: Config & OpenAiConfig & GoogleApiConfig & EtsyConfig
 ): AsyncIterable<string> {
   const [width, height] = await getImageDimensions(imagePath);
 
@@ -205,11 +296,61 @@ export async function* digitialPaintingPipeline(
 
   yield "Created video";
 
+  const conversation: Conversation = new Conversation(initOpenAi(config));
+  const title = await getTitle(conversation, prompt, outputDir);
+  const description = await getDescription(conversation, outputDir);
+
+  yield "Wrote title and description";
+
   await promisify(copyFile)(
     resolve(__dirname, "../mockups/print-sizes.png"),
     join(outputDir, "print-sizes.png")
   );
 
+  await promisify(copyFile)(
+    resolve(__dirname, "../mockups/product-info.png"),
+    join(outputDir, "product-info.png")
+  );
+
   yield "Copied miscellaneous files";
+
+  const session = new EtsySession(config);
+
+  const sections = await getShopSections(session);
+
+  const sectionName = await getSection(
+    conversation,
+    sections.map(({ title }) => title),
+    outputDir
+  );
+
+  yield "Wrote shop section: " + sectionName;
+
+  let section = sections.find((s) => s.title === sectionName);
+  if (!section) {
+    section = await createShopSection(sectionName, session);
+    yield "Created new shop section: " + sectionName;
+  }
+
+  const listingFile = join(outputDir, "listing.txt");
+  let listingId: number;
+  if (existsSync(listingFile)) {
+    console.log("Listing ID file already exists");
+    listingId = parseInt(readFileSync(listingFile, "utf-8"));
+  } else {
+    listingId = await createListing(
+      {
+        title,
+        description,
+        price: 2.0,
+        taxonomy: "Art & Collectibles",
+        section,
+      },
+      session
+    );
+    writeFileSync(listingFile, String(listingId));
+    yield "Created draft listing: " + listingId;
+  }
+
   return;
 }

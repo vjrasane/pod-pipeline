@@ -12,8 +12,8 @@ interface DiscordConfig {
 }
 
 interface GoogleApiConfig {
-  credentialsFile: string;
-  tokenFile: string;
+  googleCredentialsFile: string;
+  googleTokenFile: string;
 }
 
 interface AdobeConfig {
@@ -26,6 +26,11 @@ interface ShutterstockConfig {
   shutterstockPassword: string;
 }
 
+interface EtsyConfig {
+  etsyCredentialsFile: string;
+  etsyTokenFile: string;
+}
+
 export {
   Config,
   OpenAiConfig,
@@ -33,4 +38,5 @@ export {
   GoogleApiConfig,
   AdobeConfig,
   ShutterstockConfig,
+  EtsyConfig,
 };

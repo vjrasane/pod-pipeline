@@ -1,5 +1,5 @@
 // ensure canvas is loaded before sharp
-// otherwise causes weird Error: The specified procedure could not be found.
+// otherwise causes weird "Error: The specified procedure could not be found."
 import "canvas";
 import "sharp";
 
@@ -19,6 +19,8 @@ const workDir = maybe(nonEmptyString, process.cwd()).verify(
   process.env.WORK_DIR
 );
 
+const workOutputDir = join(workDir, "output");
+
 const config = {
   workDir,
   openAiApiKey: nonEmptyString.verify(process.env.OPENAI_API_KEY),
@@ -34,8 +36,10 @@ const config = {
     process.env.SHUTTERSTOCK_PASSWORD
   ),
   discordBotToken: nonEmptyString.verify(process.env.DISCORD_BOT_TOKEN),
-  credentialsFile: resolve(workDir, "./credentials.json"),
-  tokenFile: resolve(workDir, "./token.json"),
+  googleCredentialsFile: resolve(workDir, "./google-credentials.json"),
+  googleTokenFile: resolve(workDir, "./google-token.json"),
+  etsyCredentialsFile: resolve(workDir, "./etsy-credentials.json"),
+  etsyTokenFile: resolve(workDir, "./etsy-token.json"),
 };
 
 const downloadImage = async (
@@ -71,16 +75,21 @@ const onStockReaction: ReactionListener = async (
   reply
 ): Promise<void> => {
   const { message } = reaction;
-  const outputDir = join(config.workDir, message.id);
+  const messageOutputDir = join(workOutputDir, message.id);
   try {
-    const image = await downloadImage(message, outputDir);
+    const image = await downloadImage(message, messageOutputDir);
     const prompt = getPrompt(message);
     await reply(`Downloaded image`);
-    const iterable = stockImagePipeline(image, prompt, outputDir, config);
+    const iterable = stockImagePipeline(
+      image,
+      prompt,
+      messageOutputDir,
+      config
+    );
     for await (const status of iterable) {
       await reply(status);
     }
-    await promisify(rm)(outputDir, { force: true, recursive: true });
+    await promisify(rm)(messageOutputDir, { force: true, recursive: true });
     await reply("Done!");
   } catch (err) {
     await reply(`Failed to process: ${err}`);
@@ -92,12 +101,17 @@ const onPaintingReaction: ReactionListener = async (
   reply
 ): Promise<void> => {
   const { message } = reaction;
-  const outputDir = join(config.workDir, message.id);
+  const messageOutputDir = join(workOutputDir, message.id);
   try {
-    const image = await downloadImage(message, outputDir);
+    const image = await downloadImage(message, messageOutputDir);
     const prompt = getPrompt(message);
     await reply(`Downloaded image`);
-    const iterable = digitialPaintingPipeline(image, prompt, outputDir, config);
+    const iterable = digitialPaintingPipeline(
+      image,
+      prompt,
+      messageOutputDir,
+      config
+    );
     for await (const status of iterable) {
       await reply(status);
     }
