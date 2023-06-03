@@ -49,6 +49,7 @@ import {
   getShopSections,
   uploadListingFile,
   uploadListingImage,
+  uploadListingVideo,
 } from "../functions/etsy/etsy-api";
 import { EtsySession } from "../functions/etsy/etsy-auth";
 
@@ -209,7 +210,7 @@ export async function* digitialPaintingPipeline(
 
   yield "Created ISO mockup one";
 
-  await mockup(
+  const northprintsIsoMockup = await mockup(
     croppedIso,
     join(outputDir, "mockup-iso-northprints.png"),
     resolve(__dirname, "../mockups/painting-iso-northprints.psd")
@@ -217,7 +218,7 @@ export async function* digitialPaintingPipeline(
 
   yield "Created ISO mockup two";
 
-  await mockup(
+  const mockupPasserpartouIso = await mockup(
     croppedIso,
     join(outputDir, "mockup-passepartou-iso.png"),
     resolve(__dirname, "../mockups/painting-passepartou-iso.psd")
@@ -225,7 +226,7 @@ export async function* digitialPaintingPipeline(
 
   yield "Created passepartou mockup";
 
-  await mockup(
+  const mockup4x3 = await mockup(
     cropped4x3,
     join(outputDir, "mockup-4x3.png"),
     resolve(__dirname, "../mockups/painting-4x3.psd")
@@ -233,7 +234,7 @@ export async function* digitialPaintingPipeline(
 
   yield "Created 4x3 mockup";
 
-  await mockup(
+  const centerMockup = await mockup(
     cropped3x2,
     join(outputDir, "mockup-center-3x2.png"),
     resolve(__dirname, "../mockups/painting-center-3x2.psd")
@@ -241,7 +242,7 @@ export async function* digitialPaintingPipeline(
 
   yield "Created center mockup";
 
-  await mockup(
+  const closeupMockup = await mockup(
     cropped3x2,
     join(outputDir, "mockup-closeup-3x2.png"),
     resolve(__dirname, "../mockups/painting-closeup-3x2.psd")
@@ -249,7 +250,7 @@ export async function* digitialPaintingPipeline(
 
   yield "Created closeup mockup";
 
-  await multiMockup(
+  const mockupAspectRatios = await multiMockup(
     {
       graphic_3x2: cropped3x2,
       graphic_4x3: cropped4x3,
@@ -305,14 +306,16 @@ export async function* digitialPaintingPipeline(
 
   yield "Wrote title and description";
 
+  const printSizesImage = join(outputDir, "print-sizes.png");
   await promisify(copyFile)(
     resolve(__dirname, "../mockups/print-sizes.png"),
-    join(outputDir, "print-sizes.png")
+    printSizesImage
   );
 
+  const productInfoImage = join(outputDir, "product-info.png");
   await promisify(copyFile)(
     resolve(__dirname, "../mockups/product-info.png"),
-    join(outputDir, "product-info.png")
+    productInfoImage
   );
 
   yield "Copied miscellaneous files";
@@ -348,6 +351,7 @@ export async function* digitialPaintingPipeline(
         title,
         description,
         price: 2.0,
+        tags: paintingTags,
         taxonomy: "Art & Collectibles",
         section,
       },
@@ -372,19 +376,51 @@ export async function* digitialPaintingPipeline(
     yield "Uploaded listing file: " + files[downloadFileName];
   }
 
-  const images = listingData.images ?? {};
-  const imageName = getFileDescriptor(mitartsIsoMockup).base;
-  if (imageName in images) {
-    console.log("Listing image already exists: " + imageName);
+  const videos = listingData.videos ?? {};
+  const videFileName = getFileDescriptor(videoFile).base;
+  if (videFileName in videos) {
+    console.log("Listing video already exists: " + videFileName);
   } else {
-    images[imageName] = await uploadListingImage(
+    videos[videFileName] = await uploadListingVideo(
       listingData.listingId,
-      mitartsIsoMockup,
+      videoFile,
       session
     );
-    listingData.images = images;
+    listingData.videos = videos;
     writeFileSync(listingFile, JSON.stringify(listingData));
-    yield "Uploaded listing image: " + images[imageName];
+    yield "Uploaded listing video: " + videos[videFileName];
+  }
+
+  const imageFiles: string[] = [
+    mitartsIsoMockup,
+    productInfoImage,
+    mockup4x3,
+    centerMockup,
+    northprintsIsoMockup,
+    closeupMockup,
+    mockupPasserpartouIso,
+    printSizesImage,
+    mockupAspectRatios,
+  ];
+  for (let i = 0; i < imageFiles.length; i++) {
+    const imageFile = imageFiles[i];
+    const rank = i + 1;
+    const listingImages = listingData.images ?? {};
+    const imageName = getFileDescriptor(imageFile).base;
+
+    if (imageName in listingImages) {
+      console.log("Listing image already exists: " + imageName);
+    } else {
+      listingImages[imageName] = await uploadListingImage(
+        listingData.listingId,
+        imageFile,
+        rank,
+        session
+      );
+      listingData.images = listingImages;
+      writeFileSync(listingFile, JSON.stringify(listingData));
+      yield "Uploaded listing image: " + listingImages[imageName];
+    }
   }
 
   return;

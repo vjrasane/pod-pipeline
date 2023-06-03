@@ -104,6 +104,7 @@ export const createShopSection = async (
 type ListingInfo = {
   title: string;
   description: string;
+  tags: string[];
   price: number;
   taxonomy: string | ((taxonomy: Taxonomy) => boolean);
   section?: ShopSection;
@@ -113,6 +114,7 @@ export type ListingData = {
   listingId?: number;
   files?: Record<string, number>;
   images?: Record<string, number>;
+  videos?: Record<string, number>;
 };
 
 export const createListing = async (
@@ -184,6 +186,7 @@ export const uploadListingFile = async (
 export const uploadListingImage = async (
   listingId: number,
   image: string,
+  rank: number,
   session: EtsySession
 ) => {
   return session.request(async ({ credentials, token, shopId }) => {
@@ -196,9 +199,7 @@ export const uploadListingImage = async (
 
     const form = new FormData();
     form.append("image", createReadStream(image));
-    form.append("rank", 1);
-    form.append("overwrite", "true");
-
+    form.append("rank", rank);
     const response = await axios.post(
       `https://openapi.etsy.com/v3/application/shops/${shopId}/listings/${listingId}/images`,
       form,
@@ -210,12 +211,37 @@ export const uploadListingImage = async (
   });
 };
 
-// const f = resolve(
-//   __dirname,
-//   "../../output/1110186104063271083/mockup-iso-mitarts.png"
-// );
+export const uploadListingVideo = async (
+  listingId: number,
+  video: string,
+  session: EtsySession
+): Promise<number> => {
+  return session.request(async ({ credentials, token, shopId }) => {
+    const headers = {
+      Accept: "application/json",
+      "Content-Type": "application/x-www-form-urlencoded",
+      "x-api-key": credentials.client_id,
+      Authorization: `Bearer ${token.access_token}`,
+    };
 
-// uploadListingImage(
+    const form = new FormData();
+    form.append("video", createReadStream(video));
+    form.append("name", getFileDescriptor(video).base);
+
+    const response = await axios.post(
+      `https://openapi.etsy.com/v3/application/shops/${shopId}/listings/${listingId}/videos`,
+      form,
+      { headers }
+    );
+
+    const listingVideo: any = response.data;
+    return listingVideo.video_id;
+  });
+};
+
+// const f = resolve(__dirname, "../../output/1110186104063271083/video.mp4");
+
+// uploadListingVideo(
 //   1481366226,
 //   f,
 //   new EtsySession({

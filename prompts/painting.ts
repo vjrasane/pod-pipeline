@@ -44,18 +44,18 @@ ${sections.join("\n")}`
 respond with just the name of the category
 `;
 
-export const paintingTags = `
-downloadable art
-digital art print
-digital download
-digital wall art
-bedroom wall decor
-downloadable print
-ai generated art
-cottage art print
-vintage art print
-living room wall art
-farmhouse wall decor
-cottage print
-countryside print
-`;
+export const paintingTags = [
+  "downloadable art",
+  "digital art print",
+  "digital download",
+  "digital wall art",
+  "bedroom wall decor",
+  "downloadable print",
+  "cottage art print",
+  "vintage art print",
+  "living room wall art",
+  "farmhouse wall decor",
+  "cottage print",
+  "countryside print",
+  "ai generated art",
+];
