@@ -109,6 +109,12 @@ type ListingInfo = {
   section?: ShopSection;
 };
 
+export type ListingData = {
+  listingId?: number;
+  files?: Record<string, number>;
+  images?: Record<string, number>;
+};
+
 export const createListing = async (
   listing: ListingInfo,
   session: EtsySession
@@ -161,7 +167,7 @@ export const uploadListingFile = async (
     };
 
     const form = new FormData();
-    form.append("file", createReadStream(file) as any);
+    form.append("file", createReadStream(file));
     form.append("name", getFileDescriptor(file).base);
 
     const response = await axios.post(
@@ -171,18 +177,49 @@ export const uploadListingFile = async (
     );
 
     const listingFile: any = response.data;
-    console.log(listingFile);
     return listingFile.listing_file_id;
   });
 };
 
-const dwn = resolve(__dirname, "../../output/1110186104063271083/download.pdf");
+export const uploadListingImage = async (
+  listingId: number,
+  image: string,
+  session: EtsySession
+) => {
+  return session.request(async ({ credentials, token, shopId }) => {
+    const headers = {
+      Accept: "application/json",
+      "Content-Type": "application/x-www-form-urlencoded",
+      "x-api-key": credentials.client_id,
+      Authorization: `Bearer ${token.access_token}`,
+    };
 
-uploadListingFile(
-  1480948962,
-  dwn,
-  new EtsySession({
-    etsyCredentialsFile: resolve(__dirname, "../../etsy-credentials.json"),
-    etsyTokenFile: resolve(__dirname, "../../etsy-token.json"),
-  })
-);
+    const form = new FormData();
+    form.append("image", createReadStream(image));
+    form.append("rank", 1);
+    form.append("overwrite", "true");
+
+    const response = await axios.post(
+      `https://openapi.etsy.com/v3/application/shops/${shopId}/listings/${listingId}/images`,
+      form,
+      { headers }
+    );
+
+    const listingImage: any = response.data;
+    return listingImage.listing_image_id;
+  });
+};
+
+// const f = resolve(
+//   __dirname,
+//   "../../output/1110186104063271083/mockup-iso-mitarts.png"
+// );
+
+// uploadListingImage(
+//   1481366226,
+//   f,
+//   new EtsySession({
+//     etsyCredentialsFile: resolve(__dirname, "../../etsy-credentials.json"),
+//     etsyTokenFile: resolve(__dirname, "../../etsy-token.json"),
+//   })
+// );

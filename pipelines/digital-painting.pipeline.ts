@@ -43,9 +43,12 @@ import {
   paintingSection,
 } from "../prompts/painting";
 import {
+  ListingData,
   createListing,
   createShopSection,
   getShopSections,
+  uploadListingFile,
+  uploadListingImage,
 } from "../functions/etsy/etsy-api";
 import { EtsySession } from "../functions/etsy/etsy-auth";
 
@@ -198,7 +201,7 @@ export async function* digitialPaintingPipeline(
 
   yield "Cropped image";
 
-  await mockup(
+  const mitartsIsoMockup = await mockup(
     croppedIso,
     join(outputDir, "mockup-iso-mitarts.png"),
     resolve(__dirname, "../mockups/painting-iso-mitarts.psd")
@@ -332,13 +335,15 @@ export async function* digitialPaintingPipeline(
     yield "Created new shop section: " + sectionName;
   }
 
-  const listingFile = join(outputDir, "listing.txt");
-  let listingId: number;
-  if (existsSync(listingFile)) {
-    console.log("Listing ID file already exists");
-    listingId = parseInt(readFileSync(listingFile, "utf-8"));
+  const listingFile = join(outputDir, "listing.json");
+  const listingData: ListingData = existsSync(listingFile)
+    ? JSON.parse(readFileSync(listingFile, "utf-8"))
+    : {};
+
+  if (listingData.listingId != null) {
+    console.log("Listing ID already exists");
   } else {
-    listingId = await createListing(
+    listingData.listingId = await createListing(
       {
         title,
         description,
@@ -348,8 +353,38 @@ export async function* digitialPaintingPipeline(
       },
       session
     );
-    writeFileSync(listingFile, String(listingId));
-    yield "Created draft listing: " + listingId;
+    writeFileSync(listingFile, JSON.stringify(listingData));
+    yield "Created draft listing: " + listingData.listingId;
+  }
+
+  const files = listingData.files ?? {};
+  const downloadFileName = getFileDescriptor(downloadFile).base;
+  if (downloadFileName in files) {
+    console.log("Listing file already exists: " + downloadFileName);
+  } else {
+    files[downloadFileName] = await uploadListingFile(
+      listingData.listingId,
+      downloadFile,
+      session
+    );
+    listingData.files = files;
+    writeFileSync(listingFile, JSON.stringify(listingData));
+    yield "Uploaded listing file: " + files[downloadFileName];
+  }
+
+  const images = listingData.images ?? {};
+  const imageName = getFileDescriptor(mitartsIsoMockup).base;
+  if (imageName in images) {
+    console.log("Listing image already exists: " + imageName);
+  } else {
+    images[imageName] = await uploadListingImage(
+      listingData.listingId,
+      mitartsIsoMockup,
+      session
+    );
+    listingData.images = images;
+    writeFileSync(listingFile, JSON.stringify(listingData));
+    yield "Uploaded listing image: " + images[imageName];
   }
 
   return;
